@@ -846,11 +846,13 @@ export class Digimon extends EventTarget {
     const clock = new THREE.Clock();
 
     this.artboard.renderer.setAnimationLoop(() => {
-      const delta = clock.getDelta();
+      const delta = this.artboard.frameDelta(clock.getDelta());
 
       this.animationMixers.forEach((animationMixer) => {
         animationMixer.update(delta);
       });
+
+      this.artboard.runFrameHooks(delta);
 
       this.artboard.render();
     });

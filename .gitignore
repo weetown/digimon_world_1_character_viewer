@@ -27,3 +27,7 @@ dist-ssr
 *.MMD
 *.BIN
 .vercel
+
+# Game data, never committed (either case)
+*.bin
+.playwright-mcp

@@ -5,6 +5,7 @@ export type Sequence =
   | LoopStartSequence
   | LoopEndSequence
   | TextureSequence
+  | SoundSequence
   | AxisSequence;
 
 export function newSequences(dataView: DataView, startOffset: number) {
@@ -51,8 +52,11 @@ export function newSequences(dataView: DataView, startOffset: number) {
 
       sequences.push(textureSequence);
     } else if (opcode === 4) {
-      // TODO: fix, play sound
+      // Play sound. The viewer does nothing with it; we keep it for the export archive.
+      const value = dataView.getUint16(startOffset + index, IS_LITTLE_ENDIAN);
       index += 2;
+
+      sequences.push({ opcode, sequenceIndex, value });
     }
 
     if (dataView.getUint16(startOffset + index) === 0) {
@@ -98,7 +102,13 @@ function newLoopEndSequence(
   return [{ opcode, sequenceIndex, startSequenceIndex }, index];
 }
 
-interface TextureSequence {
+export interface SoundSequence {
+  opcode: 4;
+  sequenceIndex: number;
+  value: number;
+}
+
+export interface TextureSequence {
   opcode: 3;
   sequenceIndex: number;
   width: number;
@@ -143,7 +153,7 @@ function newTextureSequence(
   ];
 }
 
-interface AxisSequence {
+export interface AxisSequence {
   opcode: 0;
   sequenceIndex: number;
   keyframes: Array<Keyframe>;

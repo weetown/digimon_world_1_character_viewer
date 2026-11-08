@@ -11,6 +11,13 @@ export class Artboard {
 
   floorObject: THREE.Object3D;
 
+  // Extra per-frame work (e.g. the compare view's mixer). Called with the frame delta.
+  frameHooks: Set<(delta: number) => void> = new Set();
+
+  // Frame stepping for the compare view: when paused, deltas are zero unless a step is queued
+  paused = false;
+  private stepQueued = 0;
+
   constructor() {
     // The order of creation is important as some fields depends on others
     this.renderer = this.newRenderer();
@@ -84,6 +91,25 @@ export class Artboard {
 
   render() {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // Queues one 1/60 s step while paused
+  step() {
+    this.stepQueued += 1;
+  }
+
+  // Maps a real clock delta onto the delta animations should advance by
+  frameDelta(clockDelta: number) {
+    if (!this.paused) return clockDelta;
+    if (this.stepQueued > 0) {
+      this.stepQueued -= 1;
+      return 1 / 60;
+    }
+    return 0;
+  }
+
+  runFrameHooks(delta: number) {
+    this.frameHooks.forEach((hook) => hook(delta));
   }
 
   add(

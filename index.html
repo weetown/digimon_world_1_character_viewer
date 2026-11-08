@@ -227,6 +227,85 @@
           </div>
         </div>
 
+        <!-- Export toolbar -->
+        <div
+          class="absolute bottom-0 left-0 right-0 z-20 hidden flex-col items-center gap-2 p-4 md:flex"
+        >
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <button
+              class="button"
+              :disabled="$store.data.exportStatus === 'working'"
+              @click="$store.data.exportCurrent()"
+            >
+              <span>Export this Digimon</span>
+            </button>
+
+            <button
+              class="button"
+              :disabled="$store.data.exportStatus === 'working'"
+              @click="$store.data.exportAll()"
+            >
+              <span>Export all</span>
+            </button>
+
+            <button
+              class="button"
+              :disabled="$store.data.exportStatus === 'working'"
+              @click="$store.data.toggleCompare()"
+            >
+              <span
+                x-text="$store.data.compareOn ? 'Close compare' : 'Compare with glb'"
+              ></span>
+            </button>
+
+            <template x-if="$store.data.compareOn">
+              <div class="flex gap-3">
+                <button class="button" @click="$store.data.togglePause()">
+                  <span x-text="$store.data.paused ? 'Play' : 'Pause'"></span>
+                </button>
+                <button class="button" @click="$store.data.step()">
+                  <span>Step 1/60</span>
+                </button>
+              </div>
+            </template>
+
+            <label class="button cursor-pointer">
+              <span
+                x-text="$store.data.nodeNames ? 'nodes.json loaded' : 'Load nodes.json'"
+              ></span>
+              <input
+                type="file"
+                accept=".json,application/json"
+                class="hidden"
+                @change="$event.target.files[0] && $store.data.loadNodeNames($event.target.files[0]); $event.target.value = ''"
+              />
+            </label>
+          </div>
+
+          <div
+            class="text-sm text-white"
+            x-show="$store.data.exportMessage"
+            aria-live="polite"
+          >
+            <span x-text="$store.data.exportMessage"></span>
+            <template x-if="$store.data.exportProgress">
+              <span
+                x-text="` (${$store.data.exportProgress.done}/${$store.data.exportProgress.total})`"
+              ></span>
+            </template>
+          </div>
+
+          <template x-if="$store.data.exportLog.length">
+            <ul
+              class="max-h-24 max-w-2xl overflow-y-auto rounded bg-black/60 p-2 text-xs text-yellow-200"
+            >
+              <template x-for="line in $store.data.exportLog">
+                <li x-text="line"></li>
+              </template>
+            </ul>
+          </template>
+        </div>
+
         <!-- Digimon selector -->
         <div
           x-data="{ open: false }"
