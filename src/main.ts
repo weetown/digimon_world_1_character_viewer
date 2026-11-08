@@ -467,6 +467,7 @@ Alpine.start();
 if (import.meta.env.DEV) {
   (window as unknown as { __dw1: unknown }).__dw1 = {
     exportDigimon,
+    zipPackages,
     data: () => Alpine.store("data") as InitialData,
     compare: () => compare,
   };

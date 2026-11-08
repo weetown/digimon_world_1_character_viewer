@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "build:runtime": "vite build --config vite.runtime.config.js",
-    "dev:example": "vite examples/webpet"
+    "dev:example": "vite examples/webpet",
+    "dev:poser": "vite poser --port 5174"
   },
   "devDependencies": {
     "@types/alpinejs": "^3.7.1",

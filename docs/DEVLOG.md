@@ -2,6 +2,64 @@
 
 Newest first. One entry per chunk of work: what changed and why.
 
+## 2026-11-08 (evening) — Poser: in-browser posing and animation on top of the glb
+
+Aspen: "I'd like to be able to pose these and switch faces and stuff in the ui", then: "map
+keyframes to have animations that can play back and loop, swapping textures recorded as
+well ... select multiple parts at once to move with a gizmo ... a simple bone system ...
+idle as the base pose, but editing with easing would be so helpful." Built without a
+design doc at Aspen's request ("i don't want all the prep").
+
+**What it is.** A second Vite page, `poser/` (`yarn dev:poser`, port 5174), that loads an
+export zip (or a bare glb from this viewer, DW1ModelConverter or dw2_model_converter) and
+gives a posing + keyframing UI. Nothing here touches the raw game data.
+
+- Rig: the game's node tree *is* the bone hierarchy; each part rotates about its own node
+  origin (the joint). The UI only lets children rotate (root may translate), so nothing
+  detaches. No new rig was built.
+- Base pose: first frame of the first clip (`a00_*` / `anim-0`).
+- Selection by raycast, shift-click to add; selected parts get a yellow wireframe overlay
+  (shape, not just colour). `TransformControls` in rotate mode drives a pivot at the last
+  selected joint; the world-space delta is applied to every selected node in its own local
+  space (Blender's "individual origins" feel).
+- Timeline: 20 fps frame grid (game time), per-node rows with diamonds, face row, ruler.
+  Keys store **quaternions** (first version stored Euler read back from the node, and
+  three.js returned equivalent-but-different triples, so deltas drifted; caught by the
+  scripted check: -90° where -30° was expected). Per-key easing: linear, easeIn, easeOut,
+  easeInOut, step; eased curves bake to one key per frame on export so the glb stays LINEAR.
+- Auto-key on by default; K / Shift+K / Delete / Shift+arrows / Space / Ctrl+Z; nudge
+  buttons ±5° per axis; "reset to idle".
+- Face track: click a texture-state thumbnail at the cursor; events drive `DigimonSwaps`.
+- Clips: add / duplicate / remove / rename, length, loop. Undo/redo via JSON snapshots.
+  Autosave to localStorage per source file; Save/Load project JSON.
+- Export: `<name>_custom.zip` with a glb holding the original clips plus `c_<name>` clips,
+  `swaps.json` extended with the face tracks, the PNG states, raw/ files, README and the
+  project JSON. Export goes through a temporary `THREE.Scene` so the metadata lands in
+  scene extras (a `Group` would have made it node extras). Empty clips are skipped.
+
+**Verified** (scripted, Agumon): multi-select nudge keys both parts symmetrically; eased
+midpoint samples to 0° and frame 2 to 25.2° (easeInOut(0.2) = 0.08) in-app and in the
+baked glb track; face events drive the swap state; undo/redo restores; playback advances
+and wraps; export reimports with 95 clips, custom clip metadata present, live model intact.
+Also fixed on first run: a black viewport (canvas sized while `x-cloak` hid the body; now a
+`ResizeObserver`), aside sections overlapping (flex shrink), clip dropdown not following
+the active clip.
+
+**Onion skinning** (Aspen: "i def need onion skinning before I cn really try it").
+`src/poser/onion.ts`: ghost clones of the model posed at the neighbouring *keyed* frames,
+1–3 each side, opacity falling off with distance. Earlier keys are red wireframes, later
+keys blue translucent shells (shape as well as colour). Only the parts whose world
+transform differs from the current frame are drawn; a full-body ghost painted over the
+live model and buried the silhouette. Hidden while playing, never pickable. Verified scripted: correct frames and poses per side, falloff, toggle, hide on
+play. Multi-select fix the same evening: when a parent and a descendant were both selected
+the descendant received the delta twice (world matrices read after the parent moved); world
+orientations are now snapshotted before any node is written.
+
+**Not covered yet / open.** Dragging the gizmo itself was exercised only by calling the
+same delta code the drag uses, not by a pointer drag. Keys can be moved only with
+Shift+arrows, not dragged. Easing has no curve editor. Root translation keys bake as a
+position track inside the custom clip (not split out as `__root`).
+
 ## 2026-11-08 (later) — Compare view: stopped animations, stuck after close
 
 Aspen: "the compare function is broken; the animations stop, and then the ui kinda glitches

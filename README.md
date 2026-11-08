@@ -23,6 +23,14 @@ With a BIN loaded, the toolbar at the bottom (desktop widths) offers:
 emits it standalone. `yarn dev:example` runs a drag-and-drop webpet smoke test
 (`examples/webpet/`, no game assets included).
 
+### Poser (pose, keyframe, face swaps)
+
+`yarn dev:poser` opens a second page (port 5174). Drop an export zip in: click parts to
+select (shift-click adds), rotate them with the gizmo about their joints, set keys on a
+20 fps timeline with per-key easing, drop face states on the face row, loop, and export a
+`_custom.zip` whose glb carries your clips alongside the game's. Keyboard: Space play,
+←/→ frame, Shift+←/→ move keys, K key selected, Shift+K key all, Delete remove, Ctrl+Z/Y.
+
 Design notes: [docs/superpowers/specs/2026-11-08-rigged-export-design.md](docs/superpowers/specs/2026-11-08-rigged-export-design.md).
 Running log: [docs/DEVLOG.md](docs/DEVLOG.md).
 
