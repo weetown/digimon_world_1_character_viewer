@@ -18,7 +18,12 @@ export class Artboard {
   paused = false;
   private stepQueued = 0;
 
-  constructor() {
+  // The element the canvas fills (the page's viewport pane); falls back to the body
+  private container: HTMLElement;
+
+  constructor(container: HTMLElement = document.body) {
+    this.container = container;
+
     // The order of creation is important as some fields depends on others
     this.renderer = this.newRenderer();
 
@@ -31,6 +36,9 @@ export class Artboard {
     this.floorObject = this.newFloorObject();
 
     window.addEventListener("resize", this.resizeRenderer.bind(this));
+    if (typeof ResizeObserver !== "undefined" && this.container !== document.body) {
+      new ResizeObserver(() => this.resizeRenderer()).observe(this.container);
+    }
 
     this.reset();
   }
@@ -40,7 +48,7 @@ export class Artboard {
     renderer.setSize(this.windowWidth, this.windowHeight);
     renderer.setClearColor(0x000000, 0);
 
-    document.body.appendChild(renderer.domElement);
+    this.container.appendChild(renderer.domElement);
 
     return renderer;
   }
@@ -82,10 +90,12 @@ export class Artboard {
   }
 
   get windowWidth() {
+    if (this.container !== document.body) return Math.max(this.container.clientWidth, 1);
     return Math.min(window.innerWidth, window.screen.width);
   }
 
   get windowHeight() {
+    if (this.container !== document.body) return Math.max(this.container.clientHeight, 1);
     return Math.min(window.innerHeight, window.screen.height);
   }
 

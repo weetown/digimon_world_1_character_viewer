@@ -38,6 +38,8 @@ export interface SwapsFile {
   }>;
   // keyed by glTF animation (clip) name
   animations: Record<string, SwapClipEntry>;
+  // Game-specific notes (DW2: the decoded blink rectangle and sources behind the states)
+  extras?: Record<string, unknown>;
 }
 
 // ---- Building ----

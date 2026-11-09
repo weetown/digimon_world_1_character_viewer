@@ -28,6 +28,7 @@ import { LoadedModel, loadModelFile } from "../src/poser/load";
 import { PoserScene, GizmoMode } from "../src/poser/scene";
 import { OnionSkin, OnionSettings } from "../src/poser/onion";
 import { download, exportProject } from "../src/poser/export";
+import { takeHandoff } from "../src/storage/disc-store";
 
 // ---- non-reactive state (three.js objects must stay out of the Alpine store) ----------
 let scene: PoserScene | null = null;
@@ -648,6 +649,20 @@ projectInput.addEventListener("change", () => {
   if (file) (Alpine.store("poser") as PoserStore).loadProject(file);
   projectInput.value = "";
 });
+// Opened from the viewer's "Pose this Digimon": the export zip waits in IndexedDB
+if (new URLSearchParams(window.location.search).get("from") === "viewer") {
+  takeHandoff("poser")
+    .then((parcel) => {
+      if (!parcel) return;
+      const file = new File([parcel.bytes], parcel.name, { type: "application/zip" });
+      return (Alpine.store("poser") as PoserStore).loadModel(file);
+    })
+    .catch((error) => {
+      console.error(error);
+      (Alpine.store("poser") as PoserStore).message = `Could not pick up the viewer's export: ${(error as Error).message}`;
+    });
+}
+
 window.addEventListener("dragover", (e) => e.preventDefault());
 window.addEventListener("drop", (e) => {
   e.preventDefault();

@@ -7,44 +7,85 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>Digimon World 1 - Character Viewer</title>
+    <title>Digimon World - Character Viewer</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      #viewport canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
   </head>
 
   <body
     x-data
     x-cloak
-    class="relative bg-zinc-700 bg-gradient-to-b from-zinc-700 to-zinc-900"
-    :class="$store.setup.status === 'success' ? 'overflow-hidden touch-none' : ''"
+    class="flex h-full flex-col bg-zinc-800 text-sm text-zinc-100"
   >
+    <!-- Top bar: shared app chrome, same on the poser page -->
+    <header
+      class="flex flex-wrap items-center gap-2 border-b border-zinc-700 bg-zinc-900 px-3 py-2"
+    >
+      <h1 class="mr-2 font-black">Digimon World</h1>
+      <nav class="mr-4 flex gap-1" aria-label="Pages">
+        <a class="app-tab" href="/" aria-current="page">Viewer</a>
+        <a class="app-tab" href="/poser/">Poser</a>
+      </nav>
+
+      <template x-if="$store.setup.status === 'success'">
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            class="button"
+            :disabled="$store.data.exportStatus === 'working'"
+            @click="$store.data.openInPoser()"
+          >
+            <span>Pose this Digimon</span>
+          </button>
+          <button
+            class="button"
+            :disabled="$store.data.exportStatus === 'working'"
+            @click="$store.data.exportCurrent()"
+          >
+            <span>Export this Digimon</span>
+          </button>
+        </div>
+      </template>
+
+      <span class="ml-auto truncate text-zinc-300" aria-live="polite">
+        <template x-if="$store.setup.status === 'success'">
+          <span>
+            <span
+              x-text="$store.data.exportMessage || $store.data.sideMessage"
+            ></span>
+            <template x-if="$store.data.exportProgress">
+              <span
+                x-text="` (${$store.data.exportProgress.done}/${$store.data.exportProgress.total})`"
+              ></span>
+            </template>
+          </span>
+        </template>
+      </span>
+    </header>
+
     <!-- BIN selector -->
     <template x-if="$store.setup.status !== 'success'">
-      <section class="flex h-full flex-col items-center px-4 py-16">
-        <!-- Logo -->
+      <section
+        class="flex flex-1 flex-col items-center overflow-y-auto px-4 py-10"
+      >
         <img
-          alt="Digimon World 1 - Character Viewer"
-          class="relative z-20"
+          alt="Digimon World - Character Viewer"
+          class="max-w-xs"
           src="/logo.png"
         />
 
-        <!-- Decorated boxes -->
         <div
-          class="blue-decorated-box -mt-20 h-16 w-full max-w-[min(80%,430px)] -skew-x-[10deg]"
-        ></div>
-        <div
-          class="blue-decorated-box -mt-16 h-24 w-full max-w-[min(75%,340px)] -skew-x-[5deg]"
-        ></div>
-
-        <!-- Title -->
-        <div class="blue-decorated-box relative z-10 -mt-24 p-4 pt-20">
-          <div class="relative text-center text-[min(6vw,24px)] font-black">
-            <h1 class="text-blue-950">Character Viewer</h1>
-
-            <div class="absolute -top-1.5 text-white">Character Viewer</div>
-          </div>
-        </div>
-
-        <!-- Button -->
-        <div class="mt-16">
+          class="mt-8 w-full max-w-xl rounded-lg border border-zinc-700 bg-zinc-900 p-5"
+        >
           <input
             id="fileInput"
             x-init="$store.setup.initListener()"
@@ -55,294 +96,419 @@
 
           <button x-on:click="$store.setup.selectFile()" class="button">
             <span x-show="$store.setup.status === 'idle'"
-              >Select the Digimon World's BIN</span
+              >Select a Digimon World BIN (DW1 or DW2, USA)</span
             >
-
             <span x-show="$store.setup.status === 'loading'">Loading...</span>
-
-            <span x-show="$store.setup.status === 'success'">Rendering...</span>
-
             <span x-show="$store.setup.status === 'error'"
-              >Invalid BIN, please use USA version of the game</span
+              >Not a Digimon World 1 or 2 (USA) BIN, try again</span
             >
           </button>
-        </div>
 
-        <div class="green-decorated-box mt-16">
-          <!-- Instructions -->
-          <div class="p-5 text-black">
-            <h3 class="font-bold">Instructions:</h3>
-
-            <ol class="list-inside list-decimal">
-              <li>Please, read everything before you start</li>
-              <li>Click the "Select the Digimon World's BIN" button</li>
-              <li>Select the *.BIN (USA version) owned by you</li>
-              <li>The page will change to display the characters</li>
-            </ol>
-          </div>
-
-          <!-- How it works -->
-          <ul class="list-inside list-disc p-5 pt-0 text-sm">
-            <li>The file will not be uploaded to any server</li>
-            <li>All processing happens directly on your browser</li>
-            <li>Piracy is not endorsed by the creators</li>
-            <li>You must own a legal copy of the game to use the viewer</li>
-          </ul>
-
-          <hr class="green-decorated-divider" />
-
-          <!-- Important -->
-          <div class="p-5 text-white">
-            <h3 class="font-bold">Important:</h3>
-
-            <p>
-              The website is a viewer that interprets the binary data of the
-              *.BIN and renders it accordingly, similar to an emulator.<br />Everything
-              that lives inside the Digimon World's game and extra assets like
-              texts and images are owned by
-              <a
-                href="https://en.wikipedia.org/wiki/Bandai"
-                class="link"
-                target="_blank"
-                rel="noopener noreferrer"
-                >Bandai Co., Ltd</a
-              >.
-            </p>
-
-            <p class="mt-5 text-sm opacity-75">
-              This fan-made project has no relation with Bandai or others. It
-              has no commercial purpose and the
-              <strong>codebase</strong> is distributed under the
-              <a
-                href="https://www.gnu.org/licenses/agpl-3.0.en.html"
-                class="link"
-                target="_blank"
-                rel="noopener noreferrer"
-                >AGPL License</a
-              >.
-            </p>
-          </div>
-        </div>
-
-        <div class="mt-16 space-y-8 text-sm text-white opacity-75">
-          <ul>
+          <h2 class="mt-5 font-bold">How it works</h2>
+          <ul class="mt-1 list-inside list-disc text-zinc-300">
+            <li>Pick the *.BIN (USA) of Digimon World 1 or 2 that you own</li>
             <li>
-              <a
-                href="https://github.com/marceloadsj/digimon_world_1_character_viewer.git"
-                class="link"
-                target="_blank"
-                rel="noopener noreferrer"
-                >Github Repository</a
-              >
+              The file stays in this browser's storage, so next time the viewer
+              opens straight away ("Forget saved BINs" in the Discs panel clears
+              it; add ?nobin to the address for this screen)
+            </li>
+            <li>Nothing is uploaded; everything runs in this browser</li>
+            <li>
+              Side by side loads the other game's BIN later, from the Discs
+              panel
+            </li>
+            <li>
+              The Poser tab animates an exported Digimon; "Pose this Digimon"
+              sends the current one over
             </li>
           </ul>
 
-          <div>
-            <h3 class="font-bold">Credits:</h3>
+          <p class="mt-5 text-xs text-zinc-400">
+            The viewer interprets the game's binary data in the browser, like an
+            emulator. Everything inside the game is owned by
+            <a
+              href="https://en.wikipedia.org/wiki/Bandai"
+              class="link"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Bandai Co., Ltd</a
+            >. This fan-made project has no relation with Bandai, has no
+            commercial purpose, and its codebase is under the
+            <a
+              href="https://www.gnu.org/licenses/agpl-3.0.en.html"
+              class="link"
+              target="_blank"
+              rel="noopener noreferrer"
+              >AGPL License</a
+            >. Piracy is not endorsed; you must own a legal copy of the game.
+          </p>
+        </div>
 
-            <ul class="list-inside list-disc">
-              <li>
-                <a
-                  href="https://github.com/sydmontague"
-                  class="link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  SydMontague - Main contributor for the game's binary structure
-                </a>
-              </li>
-
-              <li>
-                <a
-                  href="https://github.com/roblouie/tmd"
-                  class="link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Roblouie - Creator of the TMD interpreter
-                </a>
-              </li>
-
-              <li>
-                <a
-                  href="https://ultimatepopculture.fandom.com/wiki/Digimon_World_(series)"
-                  class="link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  >Digimon World's logo from Bandai, extracted from
-                  Fandom/Ultimate Pop Culture</a
-                >
-              </li>
-            </ul>
-          </div>
+        <div class="mt-6 text-xs text-zinc-400">
+          <a
+            href="https://github.com/marceloadsj/digimon_world_1_character_viewer.git"
+            class="link"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Github repository</a
+          >
+          · Credits:
+          <a
+            href="https://github.com/sydmontague"
+            class="link"
+            target="_blank"
+            rel="noopener noreferrer"
+            >SydMontague</a
+          >
+          (game binary structure),
+          <a
+            href="https://github.com/roblouie/tmd"
+            class="link"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Roblouie</a
+          >
+          (TMD interpreter),
+          <a
+            href="https://ultimatepopculture.fandom.com/wiki/Digimon_World_(series)"
+            class="link"
+            target="_blank"
+            rel="noopener noreferrer"
+            >logo via Fandom</a
+          >
         </div>
       </section>
     </template>
 
-    <!-- Viewer -->
-    <template x-if="$store.setup.status === 'success'">
-      <section class="select-none">
-        <!-- Animation selector -->
-        <div
-          x-data="{ open: false }"
-          class="green-decorated-box absolute top-0 flex w-64 flex-col md:bottom-0"
-          :class="open ? 'z-10 bottom-0' : ''"
+    <!-- Viewer. The viewport pane is always in the page (the renderer mounts into it before
+         the panels exist); the panels appear once a disc is loaded. -->
+    <div
+      class="flex min-h-0 flex-1 flex-col md:flex-row"
+      x-show="$store.setup.status === 'success'"
+    >
+      <template x-if="$store.setup.status === 'success'">
+        <!-- Left: which Digimon, which animation -->
+        <aside
+          class="flex max-h-[40vh] w-full flex-col border-b border-zinc-700 bg-zinc-900 md:order-1 md:max-h-none md:w-64 md:border-b-0 md:border-r"
         >
-          <!-- Info -->
-          <button class="p-5" @click="open = !open">
-            <h1
-              class="text-center text-xl font-black text-black"
-              x-text="$store.data.digimon.info.name"
-            ></h1>
-          </button>
-
-          <hr
-            class="green-decorated-divider"
-            :class="open ? 'block' : 'hidden md:block'"
-          />
-
-          <!-- Animations list -->
-          <div
-            class="flex-1 overflow-y-scroll p-5"
-            :class="open ? 'block' : 'hidden md:block'"
+          <section
+            class="flex min-h-0 flex-1 flex-col p-3"
+            x-data="{ filter: '' }"
           >
-            <div class="flex flex-col">
+            <h2 class="panel-title">
+              Digimon
+              <span
+                class="ml-1 rounded bg-zinc-700 px-1 text-[10px] text-zinc-200"
+                x-text="$store.data.game.toUpperCase()"
+              ></span>
+            </h2>
+            <input
+              type="search"
+              class="field mb-2"
+              placeholder="Filter by name or number"
+              aria-label="Filter Digimon"
+              x-model="filter"
+            />
+            <ul
+              class="min-h-0 flex-1 overflow-y-auto rounded border border-zinc-700"
+            >
+              <template
+                x-for="info in $store.data.INFOS.filter(i => i && (!filter || `${i.index} ${i.name}`.toLowerCase().includes(filter.toLowerCase())))"
+                :key="info.index"
+              >
+                <li>
+                  <button
+                    class="list-item"
+                    :aria-pressed="$store.data.index === info.index"
+                    @click="$store.data.setIndex(info.index)"
+                  >
+                    <span
+                      class="w-8 text-right font-mono text-xs text-zinc-500"
+                      x-text="info.index"
+                    ></span>
+                    <span class="truncate" x-text="info.name"></span>
+                  </button>
+                </li>
+              </template>
+            </ul>
+          </section>
+
+          <section
+            class="flex min-h-0 flex-1 flex-col border-t border-zinc-700 p-3"
+          >
+            <h2 class="panel-title">
+              Animation
+              <span
+                class="normal-case text-zinc-500"
+                x-text="`· ${$store.data.digimon.info.name}`"
+              ></span>
+            </h2>
+            <ul
+              class="min-h-0 flex-1 overflow-y-auto rounded border border-zinc-700"
+            >
               <template
                 x-for="(animation, index) in $store.data.digimon.animations"
+                :key="index"
               >
-                <button
-                  :class="$store.data.animationIndex === index ? 'bg-green-900 text-white' : 'text-black'"
-                  class="mt-1 flex p-2 transition"
-                  @click="$store.data.setAnimationIndex(index); open = false"
-                  x-show="animation"
-                >
-                  <span class="px-3" x-text="index"></span>
-                  <span
-                    class="flex-1"
-                    x-text="$store.data.ANIMATIONS[index]"
-                  ></span>
-                </button>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <!-- Export toolbar -->
-        <div
-          class="absolute bottom-0 left-0 right-0 z-20 hidden flex-col items-center gap-2 p-4 md:flex"
-        >
-          <div class="flex flex-wrap items-center justify-center gap-3">
-            <button
-              class="button"
-              :disabled="$store.data.exportStatus === 'working'"
-              @click="$store.data.exportCurrent()"
-            >
-              <span>Export this Digimon</span>
-            </button>
-
-            <button
-              class="button"
-              :disabled="$store.data.exportStatus === 'working'"
-              @click="$store.data.exportAll()"
-            >
-              <span>Export all</span>
-            </button>
-
-            <button
-              class="button"
-              :disabled="$store.data.exportStatus === 'working'"
-              @click="$store.data.toggleCompare()"
-            >
-              <span
-                x-text="$store.data.compareOn ? 'Close compare' : 'Compare with glb'"
-              ></span>
-            </button>
-
-            <template x-if="$store.data.compareOn">
-              <div class="flex gap-3">
-                <button class="button" @click="$store.data.togglePause()">
-                  <span x-text="$store.data.paused ? 'Play' : 'Pause'"></span>
-                </button>
-                <button class="button" @click="$store.data.step()">
-                  <span>Step 1/60</span>
-                </button>
-              </div>
-            </template>
-
-            <label class="button cursor-pointer">
-              <span
-                x-text="$store.data.nodeNames ? 'nodes.json loaded' : 'Load nodes.json'"
-              ></span>
-              <input
-                type="file"
-                accept=".json,application/json"
-                class="hidden"
-                @change="$event.target.files[0] && $store.data.loadNodeNames($event.target.files[0]); $event.target.value = ''"
-              />
-            </label>
-          </div>
-
-          <div
-            class="text-sm text-white"
-            x-show="$store.data.exportMessage"
-            aria-live="polite"
-          >
-            <span x-text="$store.data.exportMessage"></span>
-            <template x-if="$store.data.exportProgress">
-              <span
-                x-text="` (${$store.data.exportProgress.done}/${$store.data.exportProgress.total})`"
-              ></span>
-            </template>
-          </div>
-
-          <template x-if="$store.data.exportLog.length">
-            <ul
-              class="max-h-24 max-w-2xl overflow-y-auto rounded bg-black/60 p-2 text-xs text-yellow-200"
-            >
-              <template x-for="line in $store.data.exportLog">
-                <li x-text="line"></li>
+                <li x-show="animation">
+                  <button
+                    class="list-item"
+                    :aria-pressed="$store.data.animationIndex === index"
+                    @click="$store.data.setAnimationIndex(index)"
+                  >
+                    <span
+                      class="w-8 text-right font-mono text-xs text-zinc-500"
+                      x-text="index"
+                    ></span>
+                    <span
+                      class="truncate"
+                      x-text="$store.data.ANIMATIONS[index]"
+                    ></span>
+                  </button>
+                </li>
               </template>
             </ul>
-          </template>
-        </div>
-
-        <!-- Digimon selector -->
-        <div
-          x-data="{ open: false }"
-          class="blue-decorated-box absolute bottom-0 right-0 flex w-64 flex-col-reverse md:top-0 md:flex-col"
-          :class="open ? 'z-10 top-0' : ''"
-        >
-          <!-- Title -->
-          <button class="p-5" @click="open = !open">
-            <h3 class="text-center text-xl font-black text-black">Digimons</h3>
-          </button>
-
-          <hr
-            class="blue-decorated-divider"
-            :class="open ? 'block' : 'hidden md:block'"
-          />
-
-          <!-- Digimons list -->
-          <div
-            class="flex-1 overflow-y-scroll p-5"
-            :class="open ? 'block' : 'hidden md:block'"
-          >
-            <div class="flex flex-col space-y-1">
-              <template x-for="info in $store.data.INFOS">
-                <button
-                  :class="$store.data.index === info?.index ? 'bg-blue-900 text-white' : 'text-black'"
-                  class="flex p-2 transition"
-                  @click="info && $store.data.setIndex(info.index); open = false"
-                >
-                  <span class="px-3" x-text="info?.index"></span>
-                  <span class="flex-1" x-text="info?.name"></span>
-                </button>
-              </template>
+            <div class="mt-2 flex gap-2">
+              <button
+                class="tool"
+                @click="$store.data.togglePause()"
+                x-text="$store.data.paused ? 'Play' : 'Pause'"
+              ></button>
+              <button class="tool" @click="$store.data.step()">
+                Step 1/60
+              </button>
+              <span class="self-center text-xs text-zinc-500"
+                >Drag the model to turn it</span
+              >
             </div>
-          </div>
-        </div>
-      </section>
-    </template>
+          </section>
+        </aside>
+      </template>
+
+      <!-- Centre: the model -->
+      <div
+        id="viewport"
+        class="relative order-2 min-h-[40vh] min-w-0 flex-1 touch-none select-none bg-zinc-700"
+      ></div>
+
+      <template x-if="$store.setup.status === 'success'">
+        <!-- Right: tools -->
+        <aside
+          class="order-3 flex w-full flex-col gap-4 overflow-y-auto border-t border-zinc-700 bg-zinc-900 p-3 md:w-72 md:border-l md:border-t-0"
+        >
+          <!-- Side by side -->
+          <section>
+            <h2 class="panel-title">Side by side</h2>
+            <p class="mb-2 text-xs text-zinc-400">
+              The other game's Digimon next to this one; the counterpart is
+              picked by name when there is one.
+            </p>
+            <button
+              class="tool w-full"
+              :disabled="$store.data.sideStatus === 'loading'"
+              @click="$store.data.toggleSide()"
+              x-text="$store.data.sideStatus === 'on' ? 'Close side by side' : $store.data.sideStatus === 'loading' ? 'Loading...' : `Open ${$store.data.sideGame.toUpperCase()} beside it`"
+            ></button>
+            <input
+              id="sideFileInput"
+              type="file"
+              accept=".bin"
+              class="hidden"
+              @change="$event.target.files[0] && $store.data.loadSideBin($event.target.files[0]); $event.target.value = ''"
+            />
+
+            <template x-if="$store.data.sideStatus === 'on'">
+              <div class="mt-2 flex flex-col gap-2">
+                <label class="block text-xs">
+                  <span
+                    x-text="`${$store.data.sideGame.toUpperCase()} Digimon`"
+                  ></span>
+                  <select
+                    class="field mt-1"
+                    @change="$store.data.setSideIndex(parseInt($event.target.value))"
+                  >
+                    <template
+                      x-for="info in $store.data.sideInfos"
+                      :key="info.index"
+                    >
+                      <option
+                        :value="info.index"
+                        :selected="info.index === $store.data.sideIndex"
+                        x-text="`${info.index} ${info.name}`"
+                      ></option>
+                    </template>
+                  </select>
+                </label>
+                <label class="block text-xs">
+                  Its animation
+                  <select
+                    class="field mt-1"
+                    @change="$store.data.setSideAnimationIndex(parseInt($event.target.value))"
+                  >
+                    <template
+                      x-for="(animation, index) in $store.data.sideAnimations"
+                      :key="index"
+                    >
+                      <option
+                        :value="index"
+                        :selected="index === $store.data.sideAnimationIndex"
+                        x-text="`${index} ${animation}`"
+                      ></option>
+                    </template>
+                  </select>
+                </label>
+                <label class="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    :checked="$store.data.sideMatchHeight"
+                    @change="$store.data.setSideMatchHeight($event.target.checked)"
+                  />
+                  Match height (off: native units, DW2 is about 7x DW1)
+                </label>
+
+                <label class="block text-xs">
+                  Animation source (experimental cross-game retarget)
+                  <select
+                    class="field mt-1"
+                    @change="$store.data.setSideAnimSource($event.target.value)"
+                  >
+                    <option
+                      value="own"
+                      :selected="$store.data.sideAnimSource === 'own'"
+                    >
+                      Each plays its own
+                    </option>
+                    <option
+                      value="companion"
+                      :selected="$store.data.sideAnimSource === 'companion'"
+                      x-text="`${$store.data.sideGame.toUpperCase()} plays ${$store.data.game.toUpperCase()}'s animation`"
+                    ></option>
+                    <option
+                      value="primary"
+                      :selected="$store.data.sideAnimSource === 'primary'"
+                      x-text="`${$store.data.game.toUpperCase()} plays ${$store.data.sideGame.toUpperCase()}'s animation`"
+                    ></option>
+                  </select>
+                </label>
+                <label
+                  class="flex items-center gap-2 text-xs"
+                  x-show="$store.data.sideAnimSource !== 'own'"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="$store.data.sideRetargetRelative"
+                    @change="$store.data.setSideRetargetRelative($event.target.checked)"
+                  />
+                  Correct part frames (off: copy rotations as they are)
+                </label>
+                <p
+                  class="text-xs text-zinc-400"
+                  x-show="$store.data.sideMessage"
+                  x-text="$store.data.sideMessage"
+                ></p>
+              </div>
+            </template>
+          </section>
+
+          <!-- Compare with glb -->
+          <section>
+            <h2 class="panel-title">Export check</h2>
+            <p class="mb-2 text-xs text-zinc-400">
+              Plays the exported glb beside the original so the export can be
+              eyeballed frame by frame.
+            </p>
+            <button
+              class="tool w-full"
+              :disabled="$store.data.exportStatus === 'working'"
+              @click="$store.data.toggleCompare()"
+              x-text="$store.data.compareOn ? 'Close compare' : 'Compare with exported glb'"
+            ></button>
+          </section>
+
+          <!-- Export -->
+          <section>
+            <h2 class="panel-title">Export</h2>
+            <div class="flex flex-col gap-2">
+              <button
+                class="tool w-full"
+                :disabled="$store.data.exportStatus === 'working'"
+                @click="$store.data.exportCurrent()"
+              >
+                Export this Digimon (zip)
+              </button>
+              <button
+                class="tool w-full"
+                :disabled="$store.data.exportStatus === 'working'"
+                @click="$store.data.exportAll()"
+                x-text="`Export all ${$store.data.INFOS.length} (one zip)`"
+              ></button>
+              <label class="tool w-full cursor-pointer text-center">
+                <span
+                  x-text="$store.data.nodeNames ? 'nodes.json loaded (custom part names)' : 'Load nodes.json (custom part names)'"
+                ></span>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  class="hidden"
+                  @change="$event.target.files[0] && $store.data.loadNodeNames($event.target.files[0]); $event.target.value = ''"
+                />
+              </label>
+            </div>
+            <template x-if="$store.data.exportLog.length">
+              <ul
+                class="mt-2 max-h-32 overflow-y-auto rounded bg-black/40 p-2 text-xs text-yellow-200"
+              >
+                <template x-for="line in $store.data.exportLog">
+                  <li x-text="line"></li>
+                </template>
+              </ul>
+            </template>
+          </section>
+
+          <!-- Poser -->
+          <section>
+            <h2 class="panel-title">Poser</h2>
+            <p class="mb-2 text-xs text-zinc-400">
+              Pose and keyframe this Digimon on the Poser page (opens in a new
+              tab with the export loaded).
+            </p>
+            <button
+              class="tool w-full"
+              :disabled="$store.data.exportStatus === 'working'"
+              @click="$store.data.openInPoser()"
+            >
+              Pose this Digimon
+            </button>
+          </section>
+
+          <!-- Discs -->
+          <section>
+            <h2 class="panel-title">Discs</h2>
+            <ul class="mb-2 text-xs text-zinc-300">
+              <li>
+                DW1:
+                <span
+                  x-text="$store.data.discs.dw1 ? 'loaded' : 'not loaded'"
+                ></span>
+              </li>
+              <li>
+                DW2:
+                <span
+                  x-text="$store.data.discs.dw2 ? 'loaded' : 'not loaded'"
+                ></span>
+              </li>
+            </ul>
+            <p class="mb-2 text-xs text-zinc-400">
+              Picked BINs are kept in this browser. The other game's BIN is
+              asked for when Side by side first opens.
+            </p>
+            <button class="tool w-full" @click="$store.data.forgetSaved()">
+              Forget saved BINs
+            </button>
+          </section>
+        </aside>
+      </template>
+    </div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

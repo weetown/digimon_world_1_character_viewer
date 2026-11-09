@@ -2,6 +2,209 @@
 
 Newest first. One entry per chunk of work: what changed and why.
 
+## 2026-11-09 — Cross-game retarget: DW1 pivots are what differ, not the names
+
+Aspen, looking at Garurumon with DW2 playing DW1's idle: "it seems like the nodes aren't
+quite named the same things... the movement for the tail is being assigned to the nodes
+that have the feet for the most part. can we compare the names and make a list of the
+discrepancies?"
+
+The names are `node_XX` by tree order on both sides, so the question was whether the orders
+match. `scripts/node-correspondence.ts` builds both rest skeletons, normalises them by
+height and matches joints spatially; the table made the rule obvious: DW1 skeletons have
+empty pivot nodes (no mesh: Greymon's 1, 5, 9, 14, 18, 22, the hips, shoulders and the
+root-of-body) that DW2 does not have. Drop them and the DW1 mesh nodes are the DW2 objects,
+one for one, with identical vertex counts in sequence (Agumon 14, 51, 21, 24, 14, 35...). The
+index-for-index mapping was therefore off by the number of pivots above each part, which is
+exactly tail data landing on feet.
+
+`scripts/node-rule-check.ts` tests that rule over the 97 DW1 Digimon whose first four
+letters are a DW2 code: 60 exact (counts and parents), 11 counts-only, 26 mismatches. The
+mismatches are mostly the same subtrees listed in a different order (Betamon, Mamemon,
+Monzaemon: lower body before upper in DW2), a few remeshed parts (Flarerizamon's third part
+40 vs 41 vertices), and one false pair from the four-letter rule (WaruSeadramon → WARU is
+WaruMonzaemon).
+
+`src/models/node-map.ts` now pairs the two trees of mesh-bearing nodes: exact when the
+sequence and parents agree, otherwise children of paired parents by subtree signature (own
+vertex count plus the sorted signatures below), leftovers by order and flagged. Each pair
+records the DW1 pivots above the mesh node; `retargetClip` composes those pivots' rotations
+onto the DW2 object (DW1 → DW2), sampling each chain member at the union of their key times,
+and drives the DW1 mesh node from the DW2 object with the pivots held at rest (DW2 → DW1).
+Both rig classes expose `rigShape` (parents, vertex counts). The status line now reports
+how the parts were paired and how many are remeshed.
+
+**Frames.** With the mapping right, walking still looked pitched. The first "relative to
+rest" maths applied each delta in the part's own local frame, and the two games author a
+part's local axes differently even when it sits in the same place (the vertices are in that
+frame, so anything goes). The correct form uses world rest orientations: with
+`C_i = inv(W_src_i) * W_tgt_i`, `L_tgt(t) = inv(C_parent) * L_src(t) * C_i`, which makes the
+target part follow the source part's world motion whatever the axes; DW2 → DW1 is the
+inverse with the pivots' rest taken off the front. `scripts/retarget-check.ts` measures
+`inv(W_dw1(t)) * W_dw2(t)` over a clip: 0.00° drift on every Garurumon part. The remaining
+"pitch" in screenshots turned out to be phase: the retargeted clip starts at frame 0 when
+applied while the DW1 model is mid-cycle, so the two were never the same frame.
+`applyAnimSource` now restarts the source too (`restartAnimation` on both rig classes), and
+Pause / Step then compare like for like: running and happy match part for part. The DW1
+viewer scatters parts for a moment at its own frame 0 after a restart (its pose fade); that
+is the old DW1 playback, not the retarget. The DW1 viewer plays intro-then-loop while the
+flat clip repeats whole, so the two drift apart after the first cycle.
+
+Scripts (`scripts/`, run with `npx vite-node`, both BINs in the repo root):
+`node-correspondence.ts` (spatial joint matching table), `node-rule-check.ts` (the rule over
+all code-matched pairs), `retarget-check.ts` and `retarget-check2.ts` (drift and rest
+relations per part).
+
+## 2026-11-09 — One app: top bar with Viewer / Poser tabs, tool panels, poser handoff
+
+Aspen: "where is the animation tool btw? none of this is super visible, there's lots of
+different screens... can you overhaul the ui to mke it all available?"
+
+The poser was a second Vite app on its own port with no link from the viewer, so it did not
+exist as far as the page showed. Now `vite.config.js` builds both `index.html` and
+`poser/index.html` from one root, so `yarn dev` serves `/` and `/poser/` and the Vercel build
+ships both. Both pages share a top bar (title, Viewer / Poser tabs, status line) and the
+poser's flat dark panel style; the viewer's game-themed green/blue boxes and the bottom
+toolbar that was hidden on narrow screens are gone.
+
+Viewer layout: left column is the Digimon list (with a filter box and a DW1/DW2 badge) over
+the animation list with Pause / Step; centre is the model, which the `Artboard` now mounts
+into a `#viewport` pane and sizes with a ResizeObserver instead of the window; right column
+is the tools in named panels: Side by side (with its pickers, match height and the
+cross-game animation source), Export check (compare with glb), Export (this / all /
+nodes.json, warnings), Poser, Discs (what is loaded, forget saved BINs). Under `md` the
+columns stack. The viewport pane stays in the page from the start, because `init()` runs
+before the setup store flips to success and the panels render.
+
+"Pose this Digimon" exports the current Digimon, drops the zip in a `handoff` object store
+(same IndexedDB, version 2) and opens `/poser/?from=viewer` in a new tab; the poser takes
+the parcel on boot and loads it like a dropped file. `yarn dev:poser` now just opens
+`/poser/` on the one server.
+
+## 2026-11-08 (late) — DW1 and DW2 side by side; BINs kept in the browser
+
+Aspen: "can we have it load dw1 and dw2 models side by side to compare?" and, while that was
+being checked, "since this is just a tool for me to use locally, can we set it up so that it
+saves the data it loads and keeps it there so I dn't have to keep reloading every time?"
+
+**Side by side** (`src/models/side-by-side.ts`). Both model classes gained a `companion`
+option: no camera, no render loop of their own, mixers advanced from the artboard's frame
+hooks (the same hook set the compare view uses). The companion's root is reparented under a
+group that carries the x offset, the drag rotation, and an optional scale matching the main
+Digimon's height; the camera framing is the compare view's, pulled out into `framePair` and
+shared. Both discs can be loaded at once now: `loadBin` returns which game it recognised and
+no longer clears the other. The counterpart is picked by DW2's four-letter file code against
+the first four letters of the DW1 name (AGUM, GREY...), on open and when the main Digimon
+changes; a message says when there is no match. Compare-with-glb and side-by-side are
+exclusive (same spot to the right). The companion object lives in a module variable; only
+indexes, names and status go on the Alpine store (see the proxy notes below).
+
+**Saved BINs** (`src/storage/disc-store.ts`). A picked BIN is stored as a Blob in IndexedDB
+keyed by game, with `navigator.storage.persist()` requested. Start-up order: saved disc for
+the URL's game (or whichever is saved), then the dev copy in the repo root, then the picker;
+the side-by-side button checks the saved copy before asking. Dev copies are not saved
+(they are already at hand). "Forget saved BINs" clears the store; `?nobin` skips the
+automatic load. Everything fails soft to the picker.
+
+**Streamlining** (Aspen: "It runs super slow because of my setup, so I need to streamline it
+as best as possible"). What was slow on the load path: the DW1 Digimon list decodes a TIM per
+Digimon to read its name and was rebuilt on every switch (now cached per game); the DW1
+sector-clean made one `slice` copy per sector, 162k of them (now views into the source); and
+the saved DW2 disc was the whole 462 MB image. Saved forms are now compact: DW1 goes in
+already sector-cleaned (332 MB, installed as-is), DW2 as a pack of just the MODEL folder
+(`src/dw2/pack.ts`: JSON index + bytes, 48.7 MB, opens in about 25 ms), built on first load
+so the image buffer can be collected. `loadBin` recognises the pack by magic and the cleaned
+DW1 by length. Start-up for the URL's game: saved, then dev copy, then any saved game.
+
+**Cross-game animation** (Aspen: "it looks like dw2 models are very close to the dw1 models. Is
+it possible for us to use the animation data on either or without it breaking? let's try").
+`src/models/retarget.ts` maps node i to node i (both rigs: synthetic root at 0 with the same
+half-turn, then the game's nodes in tree order; DW2's object order follows DW1's node order
+on the carried-over models). Only rotations cross; positions and scales are the target's
+rest. Two modes: relative (the source's change from its rest, re-applied on the target's
+rest) and absolute (source rotations as they are). DW1 clips come from the exporter's baker
+(absolute local transforms per node, so one flat clip), DW2 clips are the viewer's own. Both
+rig classes got `nodeNames`, `restTransforms`, `playForeignClip` / `stopForeignClip`; the DW1
+one runs the foreign clip on a separate mixer after stopping its own actions, and names its
+skeleton nodes like the exporter so the clip binds. Picking a driven side's own animation
+drops back to "own". Retargeting runs on the raw instances (`primaryRaw`), not the store's
+Proxy of them: a mixer created through the Proxy would hit the renderer-proxy failure from
+the DW2 work.
+
+**Open.** Side-by-side state is not in the URL. Match height uses DW1's `digimonStruct.height`
+against DW2's mesh bounds, so the two are not measured the same way; it is a viewing aid,
+not a unit ratio. Retargeting is an experiment: node counts differ on some pairs (extra
+nodes hold at rest), and whether the local axes line up is per model; see the screenshots in
+the verification notes for what Agumon looks like.
+
+## 2026-11-08 (night) — Digimon World 2: load the disc, view, export, pose
+
+Aspen: "can you make it so that I can import and export dw2 models the same way? the bin
+for it is in my downloads, I'd like for it to be able to be loaded..."
+
+**Disc.** DW2 (NTSC-U) is a plain ISO 9660 image, but the root directory only lists the
+executable and a dummy; the real tree is reachable through the path table. `src/dw2/iso.ts`
+walks the path table over the raw 2352-byte sectors and slices files out of the buffer on
+demand (no sector-cleaned copy; the 462 MB image stays as loaded). Models live in
+`/AAA/4.AAA/MODEL/MODELnnn/`: `M###CODE.BIN` (mesh + TIM + skeleton + blink table) and
+`A..K###CODE.BIN` (one animation file per letter). 395 models; 202 have the full A..K set,
+the rest only D or E (NPC / battle-only models, by the look of it).
+
+**Format** (`src/dw2/model.ts`, `anim.ts`), after jype's dw2_model_converter with two
+corrections found against the data:
+
+- Keyframes are a 3x3 3.12 matrix + int16 translation per object. The converter hands the
+  nine values to glm column-major, i.e. transposed. Read that way, Agumon's spine ran
+  sideways; read as stored (GTE row-major), the spine chain climbs (y -465 to -855, up in
+  PSX terms) and the legs descend to the floor. Row-major as stored it is.
+- The 24 "blink" bytes the converter keeps as opaque extras decode as: dest rect (x, w in
+  VRAM halfwords = 4 texels; y, h in rows), then up to eight (x, y) source positions ended by
+  0xff, then a `fe ff 00 00` tail that is still unknown (timing, probably). Checked on
+  Agumon's texture: the three sources are the open, half-closed and closed eyes drawn next
+  to the face. `src/dw2/blink.ts`.
+
+Skeleton values are depths in pre-order; most models have two roots (upper and lower body),
+parented under a synthetic `root` that carries the half-turn about X. Primitives come in
+four groups (semi-transparent/opaque x quad/tri) with a CLUT word each; one material per
+(CLUT row, half, blend mode), image rendered through that palette, same scheme as DW1. The
+winding is checked against the stored normals per model and reversed when they disagree.
+
+**Viewer.** `loadBin` now recognises either disc: DW1 by exact size, otherwise any raw image
+whose ISO tree has the DW2 MODEL folder. `?game=dw2` auto-loads
+`Digimon World 2 (USA).bin` from the repo root in dev. `Dw2Digimon` presents the same surface
+as the DW1 `Digimon` so the page, compare view and export toolbar are unchanged. The heavy
+state (three.js graph, disc data, mixer) lives in a module map keyed by a numeric id on the
+instance. Three attempts to get there: plain fields overflowed Alpine's recursive store walk
+on the parsed disc; a WeakMap keyed by the instance missed, because methods run with `this`
+as Alpine's Proxy; a property holding the object came back wrapped in a reactive Proxy that
+three's renderer rejects (`modelViewMatrix` read-only). A primitive id passes through the
+proxy untouched. Camera framing is by bounds; DW2 units are several times DW1's.
+
+**Export.** Same package shape (glb, swaps.json, PNG states, nodes.json, raw/, README) so
+the poser loads a DW2 zip unchanged and can key its blink states on the face row. Clips are
+`aNN_<letter>` (one per animation file and frame block), rows sampled at 30 fps per the
+converter's assumption; `terminationMask` 0xfe marks a looping clip. No swap events are
+written since the timing is not decoded. `swaps.json` gained an optional `extras` field
+(both schema copies) that carries the decoded blink table.
+
+**Verified** (scripted, browser driven by a Haiku subagent, screenshots read here):
+Agumon upright, textured, facing the camera; export round-trips through GLTFLoader with 14
+clips, 17 named nodes and the metadata; blink states checked against the texture; the
+poser loads the DW2 zip (17 nodes, 4 face thumbnails, 14 clips). Full sweep: 395/395 models
+export, 2804 clips, 0 failures, largest glb 1.8 MB (254LBSA); 177 models have no decodable
+blink table (first byte 0xff, no eyes to blink). Model switching, pointer rotation and the
+compare view run clean on DW2; DW1 Agumon still loads with only its pre-existing
+`undefined.texture` error. Two framing bugs found by screenshot: a wide flyer (024 HOEE,
+3200 units across) sat beyond the artboard's 7500 far plane and drew nothing, so the DW2
+viewer now extends the far plane; and the compare view only shifted the camera sideways,
+which cut both DW2 models off, so it now saves the camera, backs off until the pair fits
+the middle 45% of the viewport (the side panels cover the rest) and restores on close.
+
+**Open.** Blink timing (the `fe ff` tail). Model names are the file stems ("003 AGUM"); no
+name table found yet. 30 fps is inherited, not measured. Semi-transparent primitives
+(mixture rate) map to opacity/additive/subtractive blending untested on a model that has
+them. Animation file letters A..K are not named (A looks like idle for Agumon).
+
 ## 2026-11-08 (evening) — Poser: in-browser posing and animation on top of the glb
 
 Aspen: "I'd like to be able to pose these and switch faces and stuff in the ui", then: "map

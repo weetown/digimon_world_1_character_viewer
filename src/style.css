@@ -62,3 +62,45 @@
 .-skew-x-10 {
   @apply -skew-x-[10deg];
 }
+
+/* Shared app chrome (viewer and poser): flat dark panels, one top bar with page tabs */
+.app-tab {
+  @apply rounded px-3 py-1 font-bold text-zinc-300 hover:bg-zinc-800 hover:text-white;
+}
+
+.app-tab[aria-current="page"] {
+  @apply bg-yellow-400/20 text-yellow-200;
+}
+
+.panel-title {
+  @apply mb-1 text-xs font-bold uppercase tracking-wide text-zinc-400;
+}
+
+.tool {
+  @apply rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-100 hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent;
+}
+
+.tool[aria-pressed="true"] {
+  @apply border-yellow-400 bg-yellow-400/20 text-yellow-200;
+}
+
+.field {
+  @apply w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-xs text-zinc-100;
+}
+
+.list-item {
+  @apply flex w-full items-center gap-2 px-2 py-1 text-left text-sm hover:bg-zinc-800;
+}
+
+.list-item[aria-pressed="true"] {
+  @apply bg-yellow-400/20 text-yellow-200;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .button:hover,
+  .button:active {
+    transition: none;
+    transform: skewX(-10deg);
+  }
+}

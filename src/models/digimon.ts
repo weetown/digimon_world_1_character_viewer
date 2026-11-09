@@ -22,6 +22,11 @@ import {
   ANIMATION_SEQUENCE_FIXES,
 } from "../data/fixes";
 import { PSX_MEMORY_SPACE_POINTER } from "../constants";
+import { bakeAnimation, BakedAnimation } from "../export/clip-baker";
+import { buildClipSet, clipBaseName } from "../export/clips";
+import { defaultNodeName } from "../export/scene-builder";
+import { IDENTITY_REST, restFromEuler, RestTransform } from "./retarget";
+import { RigShape } from "./node-map";
 
 const ANIMATION_TIME_SCALE = 1000 / 60;
 const ANIMATION_FADE_IN = 0.2;
@@ -66,6 +71,17 @@ export class Digimon extends EventTarget {
     };
   } | null>;
 
+  // A companion sits beside another Digimon that owns the camera and the render loop; it
+  // advances its mixers from the artboard's frame hooks instead.
+  private companion: boolean;
+  private frameHook: ((delta: number) => void) | null = null;
+
+  // A clip from elsewhere (another game's animation, retargeted) playing instead of the
+  // game's own animation machinery; see playForeignClip
+  private foreignMixer: THREE.AnimationMixer | null = null;
+  private foreignAction: THREE.AnimationAction | null = null;
+  private bakedCache = new Map<number, BakedAnimation>();
+
   private animationPoseTimeout: NodeJS.Timeout | null = null;
   private axisAnimationMixerEventListener:
     | ((event: THREE.Event) => void)
@@ -78,15 +94,18 @@ export class Digimon extends EventTarget {
     artboard,
     index,
     animationIndex,
+    companion = false,
   }: {
     artboard: Artboard;
     index: number;
     animationIndex: number;
+    companion?: boolean;
   }) {
     super();
 
     // The order of initialization is important as some fields depends on others
     this.artboard = artboard;
+    this.companion = companion;
 
     this.info = new Info({ index });
 
@@ -108,8 +127,16 @@ export class Digimon extends EventTarget {
     this.animationMixers = this.newAnimationMixers();
     this.animations = this.newAnimations();
 
-    this.setArtboard();
-    this.setAnimationLoop();
+    if (this.companion) {
+      this.frameHook = (delta) => {
+        this.animationMixers.forEach((animationMixer) => animationMixer.update(delta));
+        this.foreignMixer?.update(delta);
+      };
+      this.artboard.frameHooks.add(this.frameHook);
+    } else {
+      this.setArtboard();
+      this.setAnimationLoop();
+    }
 
     this.previousAnimationIndex = null;
     this.animationIndex = animationIndex;
@@ -120,12 +147,14 @@ export class Digimon extends EventTarget {
   private newSkeleton() {
     const skeleton: Array<THREE.Object3D> = [];
 
-    this.nodeStructs.forEach((nodeStruct) => {
+    this.nodeStructs.forEach((nodeStruct, index) => {
       const group =
         nodeStruct.objectIndex > -1
           ? this.meshes[nodeStruct.objectIndex]
           : new THREE.Group();
 
+      // Same names the exporter uses, so a clip built for the export plays here too
+      group.name = defaultNodeName(index);
       skeleton.push(group);
       skeleton[nodeStruct.nodeIndex]?.add(group);
     });
@@ -762,8 +791,111 @@ export class Digimon extends EventTarget {
     return this.animationMixers[0];
   }
 
+  // Node names in tree order (index 0 is the root), as the exporter names them
+  get nodeNames() {
+    return this.skeleton.map((_, index) => defaultNodeName(index));
+  }
+
+  // Tree shape for cross-game node matching: parent per node (-1 for the root) and mesh
+  // size per node (0 for the pivot groups that carry no mesh)
+  get rigShape(): RigShape {
+    return {
+      parents: this.nodeStructs.map((ns, index) => (index === 0 ? -1 : ns.nodeIndex)),
+      vertexCounts: this.nodeStructs.map((ns) =>
+        ns.objectIndex > -1 ? this.mmd.tmd.objects[ns.objectIndex]?.vertices.length ?? 0 : 0,
+      ),
+    };
+  }
+
+  private baked(animationIndex: number): BakedAnimation | null {
+    const cached = this.bakedCache.get(animationIndex);
+    if (cached) return cached;
+    const animation = this.mmd.animations[animationIndex];
+    if (!animation) return null;
+    const baked = bakeAnimation({
+      animation,
+      index: animationIndex,
+      numberOfNodes: this.info.digimonStruct.numberOfNodes,
+      fixes: ANIMATION_SEQUENCE_FIXES[this.info.index]?.[animationIndex] ?? {},
+    });
+    this.bakedCache.set(animationIndex, baked);
+    return baked;
+  }
+
+  // Rest pose per node (the idle animation's pose), for retargeting
+  get restTransforms(): RestTransform[] {
+    const first = this.mmd.animations.findIndex((a) => a !== null);
+    const baked = first >= 0 ? this.baked(first) : null;
+    return this.skeleton.map((_, index) => {
+      const value = baked?.pose[index];
+      if (index === 0 || !value) return IDENTITY_REST;
+      return restFromEuler(value.position, value.rotation, value.scale);
+    });
+  }
+
+  // The game animation baked into one flat three.js clip (absolute local transforms per
+  // node, times in seconds), the way the exporter writes it
+  bakedClip(animationIndex: number): THREE.AnimationClip | null {
+    const baked = this.baked(animationIndex);
+    if (!baked) return null;
+    return buildClipSet({
+      baked,
+      nodeNames: this.nodeNames,
+      baseName: clipBaseName(animationIndex),
+    }).flat;
+  }
+
+  // Plays a clip whose tracks name this rig's nodes, silencing the game's own animation
+  // machinery until stopForeignClip() or the next setAnimationIndex()
+  playForeignClip(clip: THREE.AnimationClip) {
+    this.clearAnimationPoseTimeout();
+    this.clearAxisAnimationMixer();
+    this.clearTextureAnimationMixer();
+    this.animationMixers.forEach((mixer) => mixer.stopAllAction());
+
+    this.foreignMixer ??= new THREE.AnimationMixer(this.rootNode);
+    if (this.foreignAction) {
+      const previous = this.foreignAction.getClip();
+      this.foreignAction.stop();
+      this.foreignMixer.uncacheClip(previous);
+    }
+    this.foreignAction = this.foreignMixer.clipAction(clip);
+    this.foreignAction.setLoop(THREE.LoopRepeat, Infinity);
+    this.foreignAction.reset().play();
+  }
+
+  get foreignClipPlaying() {
+    return this.foreignAction !== null;
+  }
+
+  // Starts the current animation again from its first frame (no fade), to line up with
+  // something else that just started
+  restartAnimation() {
+    if (this.foreignAction) {
+      this.foreignAction.reset().play();
+      return;
+    }
+    this.previousAnimationIndex = null;
+    this.playAnimation({ shouldFadeIn: false });
+  }
+
+  stopForeignClip() {
+    if (!this.foreignAction || !this.foreignMixer) return;
+    const clip = this.foreignAction.getClip();
+    this.foreignAction.stop();
+    this.foreignMixer.uncacheClip(clip);
+    this.foreignAction = null;
+    // Back to the game's own animation from its pose
+    this.previousAnimationIndex = null;
+    this.playAnimation({ shouldFadeIn: false });
+  }
+
   remove() {
     this.artboard.remove(this.rootNode);
+
+    this.foreignAction?.stop();
+    this.foreignMixer?.stopAllAction();
+    this.foreignAction = null;
 
     this.clearAxisAnimationMixer();
     this.clearTextureAnimationMixer();
@@ -773,7 +905,12 @@ export class Digimon extends EventTarget {
       animationMixer.stopAllAction();
     });
 
-    this.artboard.renderer.setAnimationLoop(null);
+    if (this.frameHook) {
+      this.artboard.frameHooks.delete(this.frameHook);
+      this.frameHook = null;
+    } else {
+      this.artboard.renderer.setAnimationLoop(null);
+    }
 
     this.meshes.forEach((mesh) => {
       [mesh.material].flat().forEach((material) => {
@@ -801,6 +938,16 @@ export class Digimon extends EventTarget {
     index: number,
     { shouldFadeIn = true }: { shouldFadeIn?: boolean } = {},
   ) {
+    if (this.foreignAction && this.foreignMixer) {
+      this.foreignAction.stop();
+      this.foreignMixer.uncacheClip(this.foreignAction.getClip());
+      this.foreignAction = null;
+      this.previousAnimationIndex = null;
+      this.animationIndex = this.mmd.animations[index] ? index : 0;
+      this.playAnimation({ shouldFadeIn: false });
+      return;
+    }
+
     if (this.animationIndex !== index) {
       this.previousAnimationIndex = this.animationIndex;
       // If no animation with the index passed exists, use the first one (idle)
@@ -851,6 +998,7 @@ export class Digimon extends EventTarget {
       this.animationMixers.forEach((animationMixer) => {
         animationMixer.update(delta);
       });
+      this.foreignMixer?.update(delta);
 
       this.artboard.runFrameHooks(delta);
 

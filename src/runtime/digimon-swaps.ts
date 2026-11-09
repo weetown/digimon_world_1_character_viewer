@@ -47,6 +47,7 @@ export interface SwapsFile {
   timeUnitSeconds: number;
   materials: Array<{ name: string; width: number; height: number; states: string[] }>;
   animations: Record<string, SwapClipEntry>;
+  extras?: Record<string, unknown>;
 }
 
 type MaterialWithMap = THREE.Material & { map: THREE.Texture | null };

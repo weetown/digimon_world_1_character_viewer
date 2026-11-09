@@ -23,9 +23,43 @@ With a BIN loaded, the toolbar at the bottom (desktop widths) offers:
 emits it standalone. `yarn dev:example` runs a drag-and-drop webpet smoke test
 (`examples/webpet/`, no game assets included).
 
+### Digimon World 2
+
+The same page reads a Digimon World 2 (USA) BIN: pick it with the same button, or in dev put
+`Digimon World 2 (USA).bin` in the repo root and open `/?game=dw2`. Its 395 models list by
+file stem (`003 AGUM`), animate from their A..K files, and export the same zip layout, with
+the model's spare eye images as texture states for the poser. Format notes in
+`src/dw2/*.ts` and the DEVLOG.
+
+**Side by side.** "Side by side: DW2" (or DW1, when a DW2 disc is open) stands a Digimon from
+the other game next to the current one. The first time it asks for that game's BIN; it then
+picks the counterpart by the four-letter code (Agumon ↔ AGUM) and follows when the main
+Digimon changes, when a match exists. The toolbar gets its own Digimon and animation pickers,
+Pause / Step, and a "Match height" toggle (on: scaled to the main Digimon's height; off: the
+games' native units, DW2's being several times larger).
+
+**Cross-game animation (experimental).** With side by side open, the "Animation source"
+picker makes one Digimon play the other game's current animation, retargeted part by part
+(rotations only, positions stay the target's own). DW1 rigs have empty pivot nodes that DW2
+folds into its parts, so parts are paired by tree shape with the pivots composed in
+(`src/models/node-map.ts`; the analysis behind it is in `scripts/`). "Correct part frames"
+converts each rotation between the two games' local axes using the parts' rest orientations,
+so the driven part follows the source part's world motion; off, the rotations copy as they
+are (and the model folds up). Both start the cycle together, so Pause / Step compare the
+same frame. The status line says how the parts were paired. Picking a driven Digimon's own
+animation ends it.
+
+**Saved BINs.** Any BIN picked with the file button is kept in the browser's IndexedDB and
+loads on the next visit without the picker, both the main disc and the side-by-side one. It
+is kept compact: DW1 already sector-cleaned, DW2 as just its MODEL folder (about 49 MB), so
+the DW2 side opens in well under a second. "Forget saved BINs" in the toolbar clears them;
+`?nobin` skips the automatic load.
+
 ### Poser (pose, keyframe, face swaps)
 
-`yarn dev:poser` opens a second page (port 5174). Drop an export zip in: click parts to
+The **Poser** tab in the top bar (`/poser/`, same server as the viewer; `yarn dev` serves
+both). "Pose this Digimon" on the viewer page exports the current Digimon and opens it there
+in a new tab; a zip or glb can also be dropped in. Click parts to
 select (shift-click adds), rotate them with the gizmo about their joints, set keys on a
 20 fps timeline with per-key easing, drop face states on the face row, loop, and export a
 `_custom.zip` whose glb carries your clips alongside the game's. Keyboard: Space play,

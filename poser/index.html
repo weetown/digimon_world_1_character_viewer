@@ -52,9 +52,13 @@
   </head>
 
   <body x-data x-cloak class="flex h-full flex-col bg-zinc-800 text-sm text-zinc-100">
-    <!-- Top bar -->
+    <!-- Top bar: shared app chrome, same on the viewer page -->
     <header class="flex flex-wrap items-center gap-2 border-b border-zinc-700 bg-zinc-900 px-3 py-2">
-      <h1 class="mr-2 font-black">Digimon Poser</h1>
+      <h1 class="mr-2 font-black">Digimon World</h1>
+      <nav class="mr-4 flex gap-1" aria-label="Pages">
+        <a class="app-tab" href="/">Viewer</a>
+        <a class="app-tab" href="/poser/" aria-current="page">Poser</a>
+      </nav>
 
       <label class="button cursor-pointer"><span>Load model</span>
         <input id="modelFile" type="file" accept=".zip,.glb,.gltf" class="hidden" /></label>
@@ -247,7 +251,7 @@
     <div class="pointer-events-none absolute inset-0 flex items-center justify-center" x-show="!$store.poser.loaded">
       <div class="rounded-lg border-2 border-dashed border-zinc-500 bg-zinc-900/80 p-8 text-center">
         <p class="text-lg font-bold">Drop an export zip here</p>
-        <p class="mt-1 text-zinc-400">From the viewer's "Export this Digimon". A bare .glb works too.</p>
+        <p class="mt-1 text-zinc-400">Or press "Pose this Digimon" on the Viewer page. A bare .glb works too.</p>
       </div>
     </div>
 

@@ -8,12 +8,49 @@ import { Artboard } from "./artboard";
 import { DigimonPackage } from "../export/exporter";
 import { DigimonSwaps } from "../runtime/digimon-swaps";
 
+export interface SavedCamera {
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+  far: number;
+}
+
+export function saveCamera(camera: THREE.PerspectiveCamera): SavedCamera {
+  return { position: camera.position.clone(), quaternion: camera.quaternion.clone(), far: camera.far };
+}
+
+export function restoreCamera(camera: THREE.PerspectiveCamera, saved: SavedCamera) {
+  camera.position.copy(saved.position);
+  camera.quaternion.copy(saved.quaternion);
+  camera.far = saved.far;
+  camera.updateProjectionMatrix();
+}
+
+// Frames a pair standing at x = 0 and x = offsetX: shift the camera to the midpoint and back
+// it off until both fit the horizontal field of view (DW2 models are several times DW1's
+// size, so the Digimon's own framing is a starting point, never enough).
+export function framePair(
+  camera: THREE.PerspectiveCamera,
+  { offsetX, height }: { offsetX: number; height: number },
+) {
+  const pairWidth = offsetX + Math.max(offsetX * 0.7, 400);
+  const halfFovY = (camera.fov * Math.PI) / 360;
+  // The canvas is its own pane now (no panels over it); leave a little margin
+  const visibleFraction = 0.85;
+  const needed = pairWidth / 2 / (Math.tan(halfFovY) * camera.aspect * visibleFraction) + height;
+  camera.position.x = offsetX / 2;
+  camera.position.z = Math.max(camera.position.z, needed);
+  camera.far = Math.max(camera.far, camera.position.length() * 2);
+  camera.updateProjectionMatrix();
+  camera.lookAt(offsetX / 2, height / 2, 0);
+}
+
 export class CompareView {
   readonly root: THREE.Object3D;
   readonly clips: THREE.AnimationClip[];
   readonly swaps: DigimonSwaps | null;
 
   private artboard: Artboard;
+  private savedCamera: SavedCamera | null = null;
   private mixer: THREE.AnimationMixer;
   private action: THREE.AnimationAction | null = null;
   private frameHook: (delta: number) => void;
@@ -89,11 +126,12 @@ export class CompareView {
 
     artboard.add(root, { shouldRender: false });
 
-    // Frame both: shift the camera so the midpoint sits in view
-    artboard.camera.position.x = offsetX / 2;
-    artboard.camera.lookAt(offsetX / 2, height / 2, 0);
+    const view = new CompareView(artboard, root, gltf.animations, swaps);
 
-    return new CompareView(artboard, root, gltf.animations, swaps);
+    view.savedCamera = saveCamera(artboard.camera);
+    framePair(artboard.camera, { offsetX, height });
+
+    return view;
   }
 
   // Plays the flat clip for a game animation index (aNN_...), stopping anything else
@@ -121,6 +159,10 @@ export class CompareView {
 
   remove() {
     this.artboard.frameHooks.delete(this.frameHook);
+    if (this.savedCamera) {
+      restoreCamera(this.artboard.camera, this.savedCamera);
+      this.savedCamera = null;
+    }
     this.action?.stop();
     this.mixer.stopAllAction();
     this.swaps?.dispose();
